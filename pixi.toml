@@ -1,0 +1,55 @@
+[workspace]
+channels = ["pytorch", "nvidia", "conda-forge", "pytorch3d"]
+name = "ManipTrans"
+platforms = ["linux-64"]
+
+[activation.env]
+LD_LIBRARY_PATH = "$PIXI_PROJECT_ROOT/.pixi/envs/default/lib"
+
+# Necessary for capturing video (resolve vulkan:No DRI3 support)
+# https://github.com/isaac-sim/IsaacGymEnvs/issues/126
+MESA_VK_DEVICE_SELECT = "10de:2204"
+
+[system-requirements]
+cuda = "12.1"
+
+[dependencies]
+python = ">=3.8,<3.9"
+pip = "*"
+setuptools = "*"
+wheel = "*"
+
+# dev-related
+git = "*"
+ruff = "*"
+
+# pufferlib build deps
+cython = "*"
+numpy = "<2"
+scipy = "*"
+
+# cuda & torch
+pytorch = "==2.3.1"
+pytorch-cuda = "==12.1"
+torchvision = "*"
+
+# ManipTrans
+omegaconf = "*"
+hydra-core = "*"
+h5py = "*"
+trimesh = "*"
+fvcore = "~=0.1.5"
+pytorch3d = { version = "*", channel = "pytorch3d" }
+
+[pypi-dependencies]
+opencv-python-headless = "*"
+open3d = "*"
+rl-games = "<2"
+smplx = { git = "https://github.com/ZhengyiLuo/smplx.git" }
+bps_torch = { git = "https://github.com/KailinLi/bps_torch.git" }
+pytorch_kinematics = "*"
+manotorch = { git = "https://github.com/lixiny/manotorch.git" }
+chamfer_distance = { git = "https://github.com/otaheri/chamfer_distance" }
+
+[tasks]
+test_deps = "python -c 'import isaacgym, torch; print(torch.cuda.is_available())'"
