@@ -19,8 +19,9 @@ pip = "*"
 setuptools = "*"
 wheel = "*"
 
-# dev-related
+# dev-related. installing git and openssl because LD_LIBRARY_PATH is set.
 git = "*"
+openssl = "==3.0.2"
 ruff = "*"
 
 # pufferlib build deps
