@@ -23,6 +23,7 @@ wheel = "*"
 git = "*"
 openssl = "==3.0.2"
 ruff = "*"
+huggingface_hub = "*"
 
 # pufferlib build deps
 cython = "*"
