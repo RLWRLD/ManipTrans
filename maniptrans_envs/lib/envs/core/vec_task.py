@@ -34,7 +34,8 @@ from typing import Dict, Any, Tuple
 import gym
 from gym import spaces
 
-from isaacgym import gymtorch, gymapi
+import gymtorch
+from isaacgym import gymapi
 from ...utils.dr_utils import (
     get_property_setter_map,
     get_property_getter_map,

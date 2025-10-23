@@ -40,6 +40,7 @@ omegaconf = "*"
 hydra-core = "*"
 h5py = "*"
 trimesh = "*"
+dm-tree = "*"
 fvcore = "~=0.1.5"
 pytorch3d = { version = "*", channel = "pytorch3d" }
 
@@ -56,3 +57,6 @@ chumpy = { git = "https://github.com/kywch/chumpy" }
 
 [tasks]
 test_deps = "python -c 'import isaacgym, torch; print(torch.cuda.is_available())'"
+
+# build local gymtorch, so that vscode debugging can be used
+build_gymtorch = "cd gymtorch; python setup.py clean; python setup.py develop"

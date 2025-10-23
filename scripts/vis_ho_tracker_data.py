@@ -170,14 +170,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dtype",
         type=str,
-        default="h2o1",
+        default="h1o1",
         choices=["h1o1", "h2o1", "h2o2"],
         help="Type of demonstration",
     )
     parser.add_argument(
         "--hand",
         type=str,
-        default="both",
+        default="right",
         choices=["right", "left", "both"],
         help="Filter demo by hand in h1o1. Ignored in h2o1 and h2o2.",
     )

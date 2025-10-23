@@ -12,7 +12,8 @@ import torch
 from ...utils import torch_jit_utils as torch_jit_utils
 from bps_torch.bps import bps_torch
 from gym import spaces
-from isaacgym import gymapi, gymtorch
+import gymtorch
+from isaacgym import gymapi
 from isaacgym.torch_utils import normalize_angle, quat_conjugate, quat_mul
 import math
 from maniptrans_envs.lib.envs.dexhands.factory import DexHandFactory

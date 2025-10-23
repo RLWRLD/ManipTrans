@@ -33,21 +33,17 @@ class ManipDataFactory:
         """We use the index to get the dataset type"""
         """Define your own dataset type and index format here"""
 
-        if type(index) == str and index.endswith("M"):
+        if type(index) is str and index.endswith("M"):
             # !!! The right hand mirrored dataset comes from the original left hand dataset
             is_mirrored = True
             index = index[:-1]
         else:
             is_mirrored = False
 
-        if type(index) == str and "@" in index:
-            dtype = "oakink2"
-        elif type(index) == str and index.startswith("g"):
-            dtype = "grabdemo"
-        elif type(index) == str and index.startswith("v"):
-            dtype = "visionpro"
+        if type(index) is str:
+            dtype = "hotracker"
         else:
-            dtype = "favor"
+            raise ValueError("Only string indices are supported in this factory.")
 
         if is_mirrored:
             dtype += "_mirrored"
