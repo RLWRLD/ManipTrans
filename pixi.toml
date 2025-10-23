@@ -52,6 +52,7 @@ bps_torch = { git = "https://github.com/KailinLi/bps_torch.git" }
 pytorch_kinematics = "*"
 manotorch = { git = "https://github.com/lixiny/manotorch.git" }
 chamfer_distance = { git = "https://github.com/otaheri/chamfer_distance" }
+chumpy = { git = "https://github.com/kywch/chumpy" }
 
 [tasks]
 test_deps = "python -c 'import isaacgym, torch; print(torch.cuda.is_available())'"
