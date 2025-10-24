@@ -34,9 +34,8 @@ To browse the dataset locally:
 Design your own training tasks based on the provided examples. The commands below will help you get started:
 
 ```bash
-### To train the ManipTrans baseline:
+### Right-hand only
 
-# Right-hand only
 # Simple retrageting from MANO to dex hand
 python scripts/mano2dexhand.py --data_idx e7816@1 --side right --dexhand inspire --headless --iter 7000
 
@@ -46,7 +45,20 @@ python scripts/train.py task=ResDexHand dexhand=inspire side=RH headless=true nu
 # to add checkpoint: checkpoint=runs/baseline__10-22-21-02-26/nn/baseline.pth
 
 # Test the trained model
-python scripts/train.py task=ResDexHand dexhand=inspire side=RH headless=false num_envs=4 learning_rate=2e-4 test=true randomStateInit=false rh_base_model_checkpoint=imitator_ckp/imitator_rh_inspire.pth lh_base_model_checkpoint=imitator_ckp/imitator_lh_inspire.pth dataIndices=[e7816@1] actionsMovingAverage=0.4 checkpoint=runs/baseline__10-22-21-02-26/nn/baseline.pth
+python scripts/train.py task=ResDexHand dexhand=inspire side=RH headless=false num_envs=4 learning_rate=2e-4 test=true randomStateInit=false rh_base_model_checkpoint=imitator_ckp/imitator_rh_inspire.pth lh_base_model_checkpoint=imitator_ckp/imitator_lh_inspire.pth dataIndices=[e7816@1] actionsMovingAverage=0.4 checkpoint=runs/0RH_e7816@1/nn/baseline.pth
+
+
+### Bimanual
+
+# Simple retrageting from MANO to dex hand
+python scripts/mano2dexhand.py --data_idx 0011 --side right --dexhand inspire --headless --iter 7000
+python scripts/mano2dexhand.py --data_idx 0011 --side left --dexhand inspire --headless --iter 7000
+
+# Bimanual, single obj
+python scripts/train.py task=ResDexHand dexhand=inspire side=BiHSO headless=true num_envs=4096 learning_rate=2e-4 test=false randomStateInit=true dataIndices=[0011] rh_base_model_checkpoint=imitator_ckp/imitator_rh_inspire.pth lh_base_model_checkpoint=imitator_ckp/imitator_lh_inspire.pth early_stop_epochs=1000 actionsMovingAverage=0.4 
+
+python scripts/train.py task=ResDexHand dexhand=inspire side=BiHSO headless=false num_envs=4 learning_rate=2e-4 test=true randomStateInit=false rh_base_model_checkpoint=imitator_ckp/imitator_rh_inspire.pth lh_base_model_checkpoint=imitator_ckp/imitator_lh_inspire.pth dataIndices=[0011] actionsMovingAverage=0.4 checkpoint=runs/ResDexHand__10-23-19-49-15/nn/ResDexHand.pth
+
 
 ```
 

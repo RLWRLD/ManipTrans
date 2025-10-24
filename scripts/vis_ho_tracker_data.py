@@ -18,13 +18,20 @@ class HandMesh:
 
         mano_layer = getattr(parent, f"mano_layer_{side}")
         faces = mano_layer.get_mano_closed_faces()
-
         pose = torch.tensor(self.data["mano_pose"])
         betas = torch.tensor(self.data["mano_betas"])
         tsl = self.data["mano_tsl"]
-        self.d_verts = (
-            mano_layer(pose.reshape(-1, 16 * 3), betas).verts.numpy() + tsl[:, None]
-        )
+
+        mano_output = mano_layer(pose.reshape(-1, 16 * 3), betas)
+        self.d_verts = mano_output.verts.numpy() + tsl[:, None]
+
+        # Extract wrist pose
+        # Wrist position is the 0-th joint
+        self.wrist_pos = mano_output.joints[:, 0].numpy() + tsl
+        # Wrist rotation matrix is the 0-th absolute transformation
+        self.wrist_rot = mano_output.transforms_abs[:, 0, :3, :3].numpy()
+        self.wrist_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.05)
+        self.wrist_frame.transform(self._get_transform(self.t))
 
         self.mesh = o3d.geometry.TriangleMesh()
         self.mesh.vertices = o3d.utility.Vector3dVector(self.d_verts[self.t])
@@ -35,6 +42,12 @@ class HandMesh:
             self.mesh.paint_uniform_color([0.31, 0.55, 0.78])
         self.mesh.compute_vertex_normals()
 
+    def _get_transform(self, t_idx):
+        transform = np.eye(4)
+        transform[:3, :3] = self.wrist_rot[t_idx]
+        transform[:3, 3] = self.wrist_pos[t_idx]
+        return transform
+
     def _load(self, parent, idx, side):
         pkl_path = os.path.join(parent.demo_path, parent.dtype, idx, f"{side}_hand.pkl")
         with open(pkl_path, "rb") as f:
@@ -44,7 +57,12 @@ class HandMesh:
         self.t = (self.t + 1) % len(self.d_verts)
         self.mesh.vertices = o3d.utility.Vector3dVector(self.d_verts[self.t])
         self.mesh.compute_vertex_normals()
-        return self.mesh
+
+        current_transform = self.wrist_frame.get_center()
+        self.wrist_frame.transform(
+            self._get_transform(self.t) @ np.linalg.inv(self._get_transform(self.t - 1))
+        )
+        return [self.mesh, self.wrist_frame]
 
 
 class ObjMesh:
@@ -85,7 +103,7 @@ class ObjMesh:
         cur = self.data["obj_trajectory"][self.t]
         self.t = (self.t + 1) % len(self.data["obj_trajectory"])
         self.mesh.transform(self.data["obj_trajectory"][self.t] @ np.linalg.inv(cur))
-        return self.mesh
+        return [self.mesh]
 
 
 class VisDemo:
@@ -145,15 +163,17 @@ class VisDemo:
                 pass
 
         for mesh in meshes:
-            vis.add_geometry(mesh.mesh)
+            for m in mesh.update():
+                vis.add_geometry(m)
 
         while True:
             should_close = not vis.poll_events()
             if should_close:
                 break
             for mesh in meshes:
-                # mesh instances have trajectory, and update() shows the next pose
-                vis.update_geometry(mesh.update())
+                for m in mesh.update():
+                    # mesh instances have trajectory, and update() shows the next pose
+                    vis.update_geometry(m)
             vis.update_renderer()
 
         vis.destroy_window()
@@ -170,7 +190,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dtype",
         type=str,
-        default="h1o1",
+        default="h2o1",
         choices=["h1o1", "h2o1", "h2o2"],
         help="Type of demonstration",
     )
