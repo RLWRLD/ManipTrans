@@ -411,11 +411,12 @@ class Mano2Dexhand:
         )
         opti = torch.optim.Adam(
             [
-                {"params": [opt_wrist_pos, opt_wrist_rot], "lr": 0.0008},
-                {"params": [opt_dof_pos], "lr": 0.0004},
+                {"params": [opt_wrist_pos, opt_wrist_rot], "lr": 0.002},
+                {"params": [opt_dof_pos], "lr": 0.001},
             ]
         )
-
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(opti, T_0=1000)
+        
         weight = []
         for k in self.dexhand.body_names:
             k = self.dexhand.to_hand(k)[0]
@@ -440,7 +441,9 @@ class Mano2Dexhand:
                 weight.append(1)
         weight = torch.tensor(weight, device=self.sim_device, dtype=torch.float32)
         iter = 0
-        past_loss = 1e10
+        best_loss = 1e10
+        no_improve_iters = 0
+        early_stop_patience = 500  # Stop if no improvement for 200 iterations
         while (self.headless and iter < max_iter) or (
             not self.headless and not self.gym.query_viewer_has_closed(self.viewer)
         ):
@@ -486,14 +489,6 @@ class Mano2Dexhand:
                 self.gym.draw_viewer(self.viewer, self.sim, False)
             self.gym.sync_frame_time(self.sim)
 
-            isaac_joints = torch.stack(
-                [
-                    self._rigid_body_state[:, self.dexhand_handles[k], :3]
-                    for k in self.dexhand.body_names
-                ],
-                dim=1,
-            )
-
             ret = self.chain.forward_kinematics(
                 opt_dof_pos_clamped[:, self.isaac2chain_order]
             )
@@ -509,18 +504,90 @@ class Mano2Dexhand:
             )
             for k in range(len(self.mano_joint_points)):
                 self.mano_joint_points[k][:, :3] = target_joints[:, k]
-            loss = torch.mean(
+
+            # Main loss: distance between current and target joint positions
+            loss_dist = torch.mean(
                 torch.norm(pk_joints - target_joints, dim=-1) * weight[None]
             )
+
+            # --- Contact-based Penalties ---
+            # Calculate contact forces on the hand bodies
+            hand_contact_forces = torch.norm(self._net_cf[:, : self.num_dexhand_bodies], dim=-1)
+
+            # Penalty for excessive force. The goal here is to generate plausible source traj.
+            loss_contact = torch.mean(hand_contact_forces)
+
+            # --- Temporal Regularization ---
+            # Penalize high velocity (difference between consecutive frames)
+            vel_wrist_pos_loss = torch.mean(
+                torch.square(opt_wrist_pos[1:] - opt_wrist_pos[:-1])
+            )
+            vel_wrist_rot_loss = torch.mean(
+                torch.square(opt_wrist_rot[1:] - opt_wrist_rot[:-1])
+            )
+            vel_dof_loss = torch.mean(
+                torch.square(opt_dof_pos_clamped[1:] - opt_dof_pos_clamped[:-1])
+            )
+            loss_temporal_vel = vel_wrist_pos_loss + vel_wrist_rot_loss + vel_dof_loss
+
+            # Penalize high acceleration (difference between 2-back frames)
+            acc_wrist_pos_loss = torch.mean(
+                torch.square(opt_wrist_pos[2:] - opt_wrist_pos[:-2])
+            )
+            acc_wrist_rot_loss = torch.mean(
+                torch.square(opt_wrist_rot[2:] - opt_wrist_rot[:-2])
+            )
+            acc_dof_loss = torch.mean(
+                torch.square(opt_dof_pos_clamped[2:] - opt_dof_pos_clamped[:-2])
+            )
+            loss_temporal_acc = acc_wrist_pos_loss + acc_wrist_rot_loss + acc_dof_loss
+
+            # Combine losses with weights
+            weight_contact = 0.01
+            weight_temp_vel = 20.0
+            weight_temp_acc = 10.0  # Acceleration penalty is usually smaller
+            loss = (
+                loss_dist
+                + weight_contact * loss_contact
+                + weight_temp_vel * loss_temporal_vel
+                + weight_temp_acc * loss_temporal_acc
+            )
+
+            # Update opt_wrist_pos/rot and opt_dof_pos
             opti.zero_grad()
             loss.backward()
             opti.step()
+            scheduler.step()
+
+            # Stopping only based on dist loss
+            if loss_dist.item() < best_loss - 1e-5:
+                best_loss = loss_dist.item()
+                no_improve_iters = 0
+            else:
+                no_improve_iters += 1
 
             if iter % 100 == 0:
-                cprint(f"{iter} {loss.item()}", "green")
-                if iter > 1 and past_loss - loss.item() < 1e-5:
-                    break
-                past_loss = loss.item()
+                # Updated print statement to show all loss components
+                cprint(
+                    f"{iter} | Total: {loss.item():.5f}"
+                    f" | Dist: {loss_dist.item():.5f}"
+                    f" | Con: {loss_contact.item() * weight_contact:.5f}"
+                    f" | Vel: {loss_temporal_vel.item() * weight_temp_vel:.5f}"
+                    f" | Acc: {loss_temporal_acc.item() * weight_temp_acc:.5f}"
+                    f" | LR: {scheduler.get_last_lr()[0]:.2e}",
+                    "green",
+                )
+            if no_improve_iters >= early_stop_patience:
+                cprint(f"Early stopping at iteration {iter} due to no improvement.", "yellow")
+                break
+
+        isaac_joints = torch.stack(
+            [
+                self._rigid_body_state[:, self.dexhand_handles[k], :3]
+                for k in self.dexhand.body_names
+            ],
+            dim=1,
+        )
 
         to_dump = {
             "opt_wrist_pos": opt_wrist_pos.detach().cpu().numpy(),
@@ -548,6 +615,7 @@ if __name__ == "__main__":
             {
                 "name": "--data_idx",
                 "type": str,
+                # "default": "0009",
                 "default": "03ac9@0",
             },
             {
